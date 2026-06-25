@@ -53,7 +53,7 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Format:
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 3000,
+        max_tokens: 1500,
         messages: [{ role: "user", content: prompt }],
       }),
     });
