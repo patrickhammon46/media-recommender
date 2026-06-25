@@ -16,8 +16,8 @@ import {
 
 const RATING_OPTIONS = [7, 8, 9, 10];
 const TELL_MORE_OPTIONS = ["What stood out?", "Rewatch it?", "Who'd you watch with?"];
-const BUFFER_LOW_WATERMARK = 5;
-const BUFFER_TARGET_SIZE = 25;
+const BUFFER_LOW_WATERMARK = 3;
+const BUFFER_TARGET_SIZE = 10;
 
 const COLORS = {
   base: "#121116",
