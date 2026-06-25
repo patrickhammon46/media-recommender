@@ -22,7 +22,7 @@ const COLORS = {
 };
 
 const RAIL_SIZE = 10;
-const BUFFER_TARGET = 25;
+const BUFFER_TARGET = 15;
 
 export default function PortalPage({ portal, userId, onNavigate }) {
   const [tab, setTab] = useState("recommendations");
