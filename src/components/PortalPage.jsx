@@ -14,21 +14,23 @@ import {
   recordInteraction,
   addToSavedList,
   upsertTitle,
+  supabase,
 } from "../lib/supabase";
 
 const COLORS = {
   base: "#121116", text: "#f4f1eb", muted: "#86807a", dim: "#5a564f",
-  gold: "#cba869", goldFaint: "#5a4f38", hairline: "#232026",
+  gold: "#cba869", goldFaint: "#5a4f38", rust: "#8c6a5a", hairline: "#232026",
 };
 
 const RAIL_SIZE = 10;
-const BUFFER_TARGET = 15;
+const BUFFER_TARGET = 15; // 10 visible + 5 reserve - sized to finish within Netlify's 10s function timeout
 
 export default function PortalPage({ portal, userId, onNavigate }) {
   const [tab, setTab] = useState("recommendations");
   const [rail, setRail] = useState([]);
   const [buffer, setBuffer] = useState([]);
   const [savedList, setSavedList] = useState([]);
+  const [watchedList, setWatchedList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [popupTitle, setPopupTitle] = useState(null);
@@ -58,10 +60,30 @@ export default function PortalPage({ portal, userId, onNavigate }) {
     }
   }, [userId, portal]);
 
+  // Watched: everything you've actually rated (liked or disliked) - separate
+  // from the watch-LATER list above. This is your history of opinions, not
+  // your queue of things to get to.
+  const loadWatched = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("wl_interactions")
+        .select("direction, rating, created_at, wl_titles(title)")
+        .eq("user_id", userId)
+        .eq("portal", portal)
+        .in("direction", ["up", "down"])
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      setWatchedList(data);
+    } catch (err) {
+      console.error("Failed to load watched list:", err.message);
+    }
+  }, [userId, portal]);
+
   useEffect(() => {
     loadRecommendations();
     loadSaved();
-  }, [loadRecommendations, loadSaved]);
+    loadWatched();
+  }, [loadRecommendations, loadSaved, loadWatched]);
 
   const replaceRailItem = (index) => {
     setRail(prev => {
@@ -86,9 +108,12 @@ export default function PortalPage({ portal, userId, onNavigate }) {
         title: title.title, art_url: null, logline: title.logline, tags: title.tags, year: title.year,
       });
       await recordInteraction({ userId, titleId: savedTitle.id, direction, rating, tellMore: null, portal });
-      if (direction === "right" || direction === "up") {
+      if (direction === "right") {
         await addToSavedList({ userId, titleId: savedTitle.id, addedVia: "swipe" });
         loadSaved();
+      }
+      if (direction === "up" || direction === "down") {
+        loadWatched();
       }
     } catch (err) {
       console.error("Failed to resolve popup swipe:", err.message);
@@ -105,6 +130,7 @@ export default function PortalPage({ portal, userId, onNavigate }) {
       <div style={styles.tabRow}>
         <Tab label="Recommendations" active={tab === "recommendations"} onClick={() => setTab("recommendations")} />
         <Tab label="To watch" active={tab === "towatch"} onClick={() => setTab("towatch")} />
+        <Tab label="Watched" active={tab === "watched"} onClick={() => setTab("watched")} />
         {tab === "recommendations" && (
           <span style={styles.regenerate} onClick={loadRecommendations}>Regenerate</span>
         )}
@@ -131,6 +157,19 @@ export default function PortalPage({ portal, userId, onNavigate }) {
             <div key={entry.id} style={{ ...styles.row, borderBottom: i === savedList.length - 1 ? "none" : `1px solid ${COLORS.hairline}` }}>
               <div style={styles.rowName}>{entry.wl_titles.title}</div>
               <div style={styles.rowWhy}>{entry.added_via === "swipe" ? "saved via swipe" : "added manually"}</div>
+            </div>
+          ))
+        )}
+        {tab === "watched" && (
+          watchedList.length === 0 ? <p style={{ color: COLORS.muted }}>Nothing watched yet.</p> :
+          watchedList.map((entry, i) => (
+            <div key={i} style={{ ...styles.row, borderBottom: i === watchedList.length - 1 ? "none" : `1px solid ${COLORS.hairline}` }}>
+              <div style={styles.rowName}>{entry.wl_titles?.title}</div>
+              {entry.direction === "up" ? (
+                <span style={styles.ratingBadge}>{entry.rating}/10</span>
+              ) : (
+                <span style={styles.dislikeArrow}>↓</span>
+              )}
             </div>
           ))
         )}
@@ -210,6 +249,8 @@ const styles = {
   row: { display: "flex", alignItems: "center", padding: "14px 0" },
   rowName: { fontSize: 14, fontWeight: 700 },
   rowWhy: { fontFamily: "ui-monospace, monospace", fontSize: 11, color: COLORS.goldFaint, marginTop: 3 },
+  ratingBadge: { fontFamily: "ui-monospace, monospace", fontSize: 13, color: COLORS.gold, fontWeight: 700 },
+  dislikeArrow: { fontSize: 16, color: COLORS.rust, fontWeight: 700 },
   infoIcon: { fontSize: 13, color: "#6e6a62", cursor: "pointer", padding: 8 },
   overlay: { position: "fixed", inset: 0, background: "rgba(5,5,7,0.85)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 },
   popup: { background: COLORS.base, padding: "32px 28px", borderRadius: 16, maxWidth: 320, textAlign: "center" },
