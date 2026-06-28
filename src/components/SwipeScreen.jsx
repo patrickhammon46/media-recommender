@@ -118,7 +118,7 @@ export default function SwipeScreen({ userId, portal, onNavigate }) {
         tellMore: tellMoreAnswer ? { answer: tellMoreAnswer } : null,
         portal,
       });
-      if (direction === "right" || direction === "up") {
+      if (direction === "right") {
         await addToSavedList({ userId, titleId: savedTitle.id, addedVia: "swipe" });
       }
     } catch (err) {
