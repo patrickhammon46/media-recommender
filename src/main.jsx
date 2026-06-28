@@ -13,18 +13,18 @@ function App() {
   const [activePortal, setActivePortal] = useState("movie");
 
   const navigate = (target, params = {}) => {
-    if (target === "portal") {
-      setActivePortal(params.portal);
-      setScreen("portal");
-    } else {
-      setScreen(target); // "home" | "swipe" | "saved"
-    }
+    if (params.portal) setActivePortal(params.portal);
+    setScreen(target); // "home" | "swipe" | "curate" | "shelf"
   };
 
   if (screen === "home") return <MainPage onNavigate={navigate} />;
-  if (screen === "portal") return <PortalPage portal={activePortal} userId={TEMP_USER_ID} onNavigate={navigate} />;
+  // "curate" reuses PortalPage for now - it already has the recommendations
+  // logic; the rename/resize to a small Top-3 view happens in the next pass.
+  if (screen === "curate") return <PortalPage portal={activePortal} userId={TEMP_USER_ID} onNavigate={navigate} />;
   if (screen === "swipe") return <SwipeScreen userId={TEMP_USER_ID} portal={activePortal} onNavigate={navigate} />;
-  if (screen === "saved") return <HistoryPage userId={TEMP_USER_ID} onNavigate={navigate} />;
+  // "shelf" reuses HistoryPage for now - it already reads wl_interactions;
+  // adding the To-Watch tab alongside History happens in the next pass.
+  if (screen === "shelf") return <HistoryPage userId={TEMP_USER_ID} onNavigate={navigate} />;
   return null;
 }
 
