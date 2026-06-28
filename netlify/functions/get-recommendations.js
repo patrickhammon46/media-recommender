@@ -1,3 +1,19 @@
+/**
+ * netlify/functions/get-recommendations.js
+ *
+ * Server-side function. The frontend calls this endpoint instead of
+ * Claude directly - the Anthropic API key lives only here, as a Netlify
+ * environment variable, never shipped to the browser.
+ *
+ * v1 approach: Claude generates recommendations directly from its own
+ * knowledge of real movies/TV shows - no TMDB integration. Tradeoff:
+ * no poster art (placeholder art only), small chance of an occasional
+ * factual slip (wrong year, etc). Upside: one less account/API key to set up.
+ *
+ * Deploy note: set ANTHROPIC_API_KEY in Netlify's dashboard under
+ * Site settings -> Environment variables. Never commit it to a file.
+ */
+
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") {
     return { statusCode: 405, body: "Method not allowed" };
@@ -53,7 +69,7 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Format:
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 1500,
+        max_tokens: 2500,
         messages: [{ role: "user", content: prompt }],
       }),
     });
@@ -65,7 +81,21 @@ Respond ONLY with valid JSON, no markdown fences, no preamble. Format:
 
     const textBlock = data.content.find(b => b.type === "text");
     const cleaned = textBlock.text.replace(/```json|```/g, "").trim();
-    const recommendations = JSON.parse(cleaned);
+
+    let recommendations;
+    try {
+      recommendations = JSON.parse(cleaned);
+    } catch (parseErr) {
+      // Response was likely truncated (hit max_tokens mid-string). Salvage
+      // whatever complete entries we can rather than failing the whole request -
+      // find the last complete object in the array and close it off cleanly.
+      const lastCompleteEntry = cleaned.lastIndexOf("},");
+      if (lastCompleteEntry === -1) {
+        throw new Error("Response was truncated and no complete entries could be recovered");
+      }
+      const salvaged = cleaned.slice(0, lastCompleteEntry + 1) + "]";
+      recommendations = JSON.parse(salvaged);
+    }
 
     return {
       statusCode: 200,
